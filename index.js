@@ -24,6 +24,7 @@ async function run() {
     await client.connect();
     const database = client.db("UniversalHostel");
     const usersCollection = database.collection("users");
+    const roomCollection = database.collection("rooms");
 
     // user post api
     app.post("/users-data", async (req, res) => {
@@ -159,6 +160,35 @@ async function run() {
     app.delete("/delete-user/:id", async (req, res) => {
       const query = { _id: ObjectId(req?.params?.id) };
       const result = await usersCollection?.deleteOne(query);
+      res.json(result);
+    });
+
+    // for getting all room
+    app.get("/rooms", async (req, res) => {
+      const cursor = roomCollection?.find({});
+      const rooms = await cursor?.toArray();
+      res.json(rooms);
+    });
+
+    // for posting rooms
+    app.post("/rooms", async (req, res) => {
+      const room = req.body;
+      const result = await roomCollection.insertOne(room);
+      res.json(result);
+    });
+
+    // for single room
+    app.get("/room/:id", async (req, res) => {
+      const query = { _id: ObjectId(req?.params?.id) };
+      const cursor = await roomCollection?.findOne(query);
+      res.json(cursor);
+      console.log(cursor);
+    });
+
+    // room delete api
+    app.delete("/delete-room/:id", async (req, res) => {
+      const query = { _id: ObjectId(req?.params?.id) };
+      const result = await roomCollection?.deleteOne(query);
       res.json(result);
     });
   } finally {
