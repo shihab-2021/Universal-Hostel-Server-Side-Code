@@ -11,8 +11,7 @@ app.use(cors());
 app.use(express.json());
 
 //uri of database
-const uri =
-  `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.avm9c.mongodb.net/?retryWrites=true&w=majority`;
+const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.avm9c.mongodb.net/?retryWrites=true&w=majority`;
 const client = new MongoClient(uri, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
@@ -178,11 +177,10 @@ async function run() {
     });
 
     // for single room
-    app.get("/room/:id", async (req, res) => {
-      const query = { _id: ObjectId(req?.params?.id) };
-      const cursor = await roomCollection?.findOne(query);
+    app.get("/rooms/:id", async (req, res) => {
+      const query = { _id: new ObjectId(req.params.id) };
+      const cursor = await roomCollection.findOne(query);
       res.json(cursor);
-      console.log(cursor);
     });
 
     // room delete api
@@ -198,9 +196,7 @@ async function run() {
 run().catch(console.dir);
 
 app.get("/", (req, res) => {
-  res.send(
-    `<h1>Universal Hostel Server</h1>`
-  );
+  res.send(`<h1>Universal Hostel Server</h1>`);
 });
 
 app.listen(port, () => {
