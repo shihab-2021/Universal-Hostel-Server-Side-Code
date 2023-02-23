@@ -147,7 +147,7 @@ async function run() {
       res.json(user);
     });
 
-    // and user by id
+    // User info by id - C
     app.get("/users/:id", async (req, res) => {
       const query = { _id: new ObjectId(req.params.id) };
       const cursor = await usersCollection.findOne(query);
