@@ -147,6 +147,13 @@ async function run() {
       res.json(user);
     });
 
+    // and user by id
+    app.get("/users/:id", async (req, res) => {
+      const query = { _id: new ObjectId(req.params.id) };
+      const cursor = await usersCollection.findOne(query);
+      res.json(cursor);
+    });
+
     //make admin
     app.put("/users/admin", async (req, res) => {
       const user = req.body;
