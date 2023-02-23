@@ -146,11 +146,19 @@ async function run() {
       res.json(user);
     });
 
-    // User info by id - C
+    // User info by id - Christos
     app.get("/users/:id", async (req, res) => {
       const query = { _id: new ObjectId(req.params.id) };
-      const cursor = await usersCollection.findOne(query);
-      res.json(cursor);
+      const result = await usersCollection.findOne(query);
+      console.log(result);
+    });
+
+    // Delete user by ID - Christos
+    app.delete("/users/:id", async (req, res) => {
+      const query = { _id: new ObjectId(req.params.id) };
+      const result = await usersCollection.deleteOne(query);
+      console.log("Deleted item successfully");
+      console.log(result);
     });
 
     //make admin
@@ -166,7 +174,6 @@ async function run() {
     app.delete("/delete-user/:id", async (req, res) => {
       const query = { _id: ObjectId(req.params.id) };
       const result = await usersCollection.deleteOne(query);
-      console.log("Deleted item successfully");
       res.json(result);
     });
 
