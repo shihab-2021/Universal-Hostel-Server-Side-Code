@@ -146,7 +146,7 @@ async function run() {
       res.json(user);
     });
 
-    // User info by id - Christos
+    // Get user info by ID - Christos
     app.get("/users/:id", async (req, res) => {
       const query = { _id: new ObjectId(req.params.id) };
       const result = await usersCollection.findOne(query);
@@ -238,7 +238,7 @@ async function run() {
 run().catch(console.dir);
 
 app.get("/", (req, res) => {
-  res.send(`<h1>Universal Hostel Server</h1>`);
+  res.send(`<h1>Universal Hostel Server Running</h1>`);
 });
 
 app.listen(port, () => {
