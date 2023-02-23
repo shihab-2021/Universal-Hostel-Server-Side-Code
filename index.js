@@ -24,6 +24,7 @@ async function run() {
     const database = client.db("UniversalHostel");
     const usersCollection = database.collection("users");
     const roomCollection = database.collection("rooms");
+    const mealCollection = database.collection("meals");
 
     // user post api
     app.post("/users-data", async (req, res) => {
@@ -187,6 +188,33 @@ async function run() {
     app.delete("/delete-room/:id", async (req, res) => {
       const query = { _id: ObjectId(req?.params?.id) };
       const result = await roomCollection?.deleteOne(query);
+      res.json(result);
+    });
+    // for getting all meal
+    app.get("/meals", async (req, res) => {
+      const cursor = mealCollection?.find({});
+      const meals = await cursor?.toArray();
+      res.json(meals);
+    });
+
+    // for posting meals
+    app.post("/meals", async (req, res) => {
+      const meal = req.body;
+      const result = await mealCollection.insertOne(meal);
+      res.json(result);
+    });
+
+    // for single meal
+    app.get("/meals/:id", async (req, res) => {
+      const query = { _id: new ObjectId(req.params.id) };
+      const cursor = await mealCollection.findOne(query);
+      res.json(cursor);
+    });
+
+    // meal delete api
+    app.delete("/delete-meal/:id", async (req, res) => {
+      const query = { _id: ObjectId(req?.params?.id) };
+      const result = await mealCollection?.deleteOne(query);
       res.json(result);
     });
   } finally {
