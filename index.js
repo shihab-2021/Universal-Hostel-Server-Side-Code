@@ -149,9 +149,10 @@ async function run() {
 
     // User info by id - C
     app.get("/users/:id", async (req, res) => {
-      const query = { _id: new ObjectId(req.params.id) };
-      const cursor = await usersCollection.findOne(query);
-      res.json(cursor);
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const user = await usersCollection.findOne(query);
+      res.send(user);
     });
 
     //make admin
