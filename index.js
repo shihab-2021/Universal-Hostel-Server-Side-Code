@@ -1,5 +1,4 @@
-const ObjectId = require("mongodb").ObjectId;
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 require("dotenv").config();
 const express = require("express");
 const app = express();
@@ -149,10 +148,9 @@ async function run() {
 
     // User info by id - C
     app.get("/users/:id", async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) };
-      const user = await usersCollection.findOne(query);
-      res.send(user);
+      const query = { _id: new ObjectId(req.params.id) };
+      const cursor = await usersCollection.findOne(query);
+      res.json(cursor);
     });
 
     //make admin
@@ -166,8 +164,9 @@ async function run() {
 
     // blog delete api
     app.delete("/delete-user/:id", async (req, res) => {
-      const query = { _id: ObjectId(req?.params?.id) };
-      const result = await usersCollection?.deleteOne(query);
+      const query = { _id: ObjectId(req.params.id) };
+      const result = await usersCollection.deleteOne(query);
+      console.log("Deleted item successfully");
       res.json(result);
     });
 
