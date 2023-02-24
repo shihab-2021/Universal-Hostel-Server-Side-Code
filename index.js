@@ -146,21 +146,6 @@ async function run() {
       res.json(user);
     });
 
-    // Get user info by ID - Christos
-    app.get("/users/:id", async (req, res) => {
-      const query = { _id: new ObjectId(req.params.id) };
-      const result = await usersCollection.findOne(query);
-      console.log(result);
-    });
-
-    // Delete user by ID - Christos
-    app.delete("/users/:id", async (req, res) => {
-      const query = { _id: new ObjectId(req.params.id) };
-      const result = await usersCollection.deleteOne(query);
-      console.log("Deleted item successfully");
-      console.log(result);
-    });
-
     //make admin
     app.put("/users/admin", async (req, res) => {
       const user = req.body;
@@ -230,6 +215,68 @@ async function run() {
       const query = { _id: ObjectId(req?.params?.id) };
       const result = await mealCollection?.deleteOne(query);
       res.json(result);
+    });
+
+    //-------------------------------------------------------------
+    //-------------------------------------------------------------
+    //------------------CHRISTOS-----------------------------------
+    //-------------------------------------------------------------
+    //-------------------------------------------------------------
+
+    // for getting all meal
+    // app.put("/meals", async (req, res) => {
+    //   const breakfast = req.body.breakfast;
+    //   const lunch = req.body.lunch;
+    //   const dinner = req.body.dinner;
+
+    //   if (breakfast.id) {
+
+    //     const cursor = await mealCollection.findOne({
+    //       _id: new ObjectId(breakfast.id),
+    //     });
+    //     const booking = cursor.bookedBy;
+
+    //     const allBreakfasts = await mealCollection.find({}).toArray();
+
+    //     allBreakfasts.map(item=>{
+    //       if(item.time="Breakfast"){
+
+    //       }
+    //     })
+
+    //     console.log(allBreakfasts);
+
+    //     booking.push(req.body.currentUser);
+
+    //     const filter = { _id: new ObjectId(breakfast.id) };
+    //     const updateDoc = { $set: { bookedBy: booking } };
+    //     const result = await mealCollection.updateOne(filter, updateDoc);
+    //     res.send(result);
+    //   }
+    // });
+
+    //Remove user from Admin position - Christos
+    app.put("/users", async (req, res) => {
+      const filter = { email: req.body.email };
+      const updateDoc = { $set: { role: "user" } };
+      const result = await usersCollection.updateOne(filter, updateDoc);
+      res.send(result);
+    });
+
+    // Get user info by ID - Christos
+    app.get("/users/:id", async (req, res) => {
+      const query = { _id: new ObjectId(req.params.id) };
+      const result = await usersCollection.findOne(query);
+      res.send(result);
+      console.log(result);
+    });
+
+    // Delete user by ID - Christos
+    app.delete("/users/:id", async (req, res) => {
+      const query = { _id: new ObjectId(req.params.id) };
+      const result = await usersCollection.deleteOne(query);
+      console.log("Deleted item successfully");
+      console.log(result);
     });
   } finally {
     // await client.close()
