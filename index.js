@@ -185,7 +185,7 @@ async function run() {
 
     // room delete api
     app.delete("/delete-room/:id", async (req, res) => {
-      const query = { _id: ObjectId(req?.params?.id) };
+      const query = { _id: new ObjectId(req?.params?.id) };
       const result = await roomCollection?.deleteOne(query);
       res.json(result);
     });
