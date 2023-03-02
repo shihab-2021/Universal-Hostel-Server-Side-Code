@@ -186,7 +186,7 @@ async function run() {
 
     // room delete api
     app.delete("/delete-room/:id", async (req, res) => {
-      const query = { _id: ObjectId(req?.params?.id) };
+      const query = { _id: new ObjectId(req?.params?.id) };
       const result = await roomCollection?.deleteOne(query);
       res.json(result);
     });
@@ -213,7 +213,7 @@ async function run() {
 
     // meal delete api
     app.delete("/delete-meal/:id", async (req, res) => {
-      const query = { _id: ObjectId(req?.params?.id) };
+      const query = { _id: new ObjectId(req?.params?.id) };
       const result = await mealCollection?.deleteOne(query);
       res.json(result);
     });
@@ -566,6 +566,7 @@ async function run() {
     app.delete("/users/:id", async (req, res) => {
       const query = { _id: new ObjectId(req.params.id) };
       const result = await usersCollection.deleteOne(query);
+      res.json(result);
       console.log("Deleted item successfully");
       console.log(result);
     });
