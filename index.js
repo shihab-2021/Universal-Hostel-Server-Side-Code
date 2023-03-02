@@ -3,10 +3,11 @@ require("dotenv").config();
 const express = require("express");
 const app = express();
 const cors = require("cors");
+const nodeCron = require("node-cron");
 const port = process.env.PORT || 5000;
 
 // middleware
-app.use(cors());
+app.use(cors({ origin: "*" }));
 app.use(express.json());
 
 //uri of database
@@ -223,37 +224,293 @@ async function run() {
     //-------------------------------------------------------------
     //-------------------------------------------------------------
 
-    // for getting all meal
-    // app.put("/meals", async (req, res) => {
-    //   const breakfast = req.body.breakfast;
-    //   const lunch = req.body.lunch;
-    //   const dinner = req.body.dinner;
+    //Room cancelation
 
-    //   if (breakfast.id) {
+    app.put("/cancelRoom", async (req, res) => {
+      const userId = req.body.currentUser;
+      const roomId = req.body.roomId;
+      const currentRoom = await roomCollection.findOne({
+        _id: new ObjectId(roomId),
+      });
+      const currentUser = await usersCollection.findOne({
+        _id: new ObjectId(userId),
+      });
 
-    //     const cursor = await mealCollection.findOne({
-    //       _id: new ObjectId(breakfast.id),
-    //     });
-    //     const booking = cursor.bookedBy;
+      if (currentRoom.category === "Business") {
+        const roomFilter = { _id: new ObjectId(roomId) };
+        const roomDoc = {
+          $set: {
+            bookedBy: [],
+            bookedOn: "",
+            bookedTill: "",
+          },
+        };
+        const updateRoom = await roomCollection.updateOne(roomFilter, roomDoc);
 
-    //     const allBreakfasts = await mealCollection.find({}).toArray();
+        const userFilter = { _id: new ObjectId(userId) };
+        const userDoc = {
+          $set: { room: "", bookedOn: "", bookedTill: "" },
+        };
+        const updateUser = await usersCollection.updateOne(userFilter, userDoc);
 
-    //     allBreakfasts.map(item=>{
-    //       if(item.time="Breakfast"){
+        console.log(updateRoom, updateUser);
+      } else {
+        const seats = currentRoom.seat;
+        const roomFilter = { _id: new ObjectId(roomId) };
+        const roomResidents = currentRoom.bookedBy.filter((e) => {
+          return e.uid != userId;
+        });
+        console.log(roomResidents);
+        const roomDoc = { $set: { bookedBy: roomResidents, seat: seats + 1 } };
+        const updateRoom = await roomCollection.updateOne(roomFilter, roomDoc);
 
-    //       }
-    //     })
+        const userFilter = { _id: new ObjectId(userId) };
+        const userDoc = {
+          $set: { room: "", bookedOn: "", bookedTill: "" },
+        };
+        const updateUser = await usersCollection.updateOne(userFilter, userDoc);
 
-    //     console.log(allBreakfasts);
+        console.log(roomResidents);
+      }
+    });
 
-    //     booking.push(req.body.currentUser);
+    //Room Selection
+    app.put("/rooms", async (req, res) => {
+      const currentUser = req.body.currentUser;
+      const roomId = req.body.roomId;
+      const rooms = await roomCollection.find({}).toArray();
+      const currentRoom = await roomCollection.findOne({
+        _id: new ObjectId(roomId),
+      });
 
-    //     const filter = { _id: new ObjectId(breakfast.id) };
-    //     const updateDoc = { $set: { bookedBy: booking } };
-    //     const result = await mealCollection.updateOne(filter, updateDoc);
-    //     res.send(result);
-    //   }
-    // });
+      const today = new Date();
+      const oneMonth = new Date(
+        `${today.getFullYear()}-${today.getMonth() + 2}-${today.getDate()}`
+      );
+
+      if (currentRoom.category === "Business") {
+        if (currentRoom.bookedBy != currentUser) {
+          const roomFilter = { _id: new ObjectId(roomId) };
+          const roomDoc = {
+            $set: {
+              bookedBy: currentUser,
+              bookedOn: today,
+              bookedTill: oneMonth,
+            },
+          };
+          const updateRoom = await roomCollection.updateOne(
+            roomFilter,
+            roomDoc
+          );
+
+          const userFilter = { _id: new ObjectId(currentUser) };
+          const userDoc = {
+            $set: { room: currentRoom, bookedOn: today, bookedTill: oneMonth },
+          };
+          const updateUser = await usersCollection.updateOne(
+            userFilter,
+            userDoc
+          );
+
+          console.log(updateRoom, updateUser);
+        }
+      } else {
+        let flag = true;
+        currentRoom.bookedBy.map((e) => {
+          if (e.uid === currentUser) {
+            flag = false;
+          }
+        });
+
+        if (flag) {
+          const seats = currentRoom.seat;
+          const roomFilter = { _id: new ObjectId(roomId) };
+          const roomResidents = [
+            ...currentRoom.bookedBy,
+            { uid: currentUser, bookedOn: today, bookedTill: oneMonth },
+          ];
+          const roomDoc = {
+            $set: { bookedBy: roomResidents, seat: seats - 1 },
+          };
+          const updateRoom = await roomCollection.updateOne(
+            roomFilter,
+            roomDoc
+          );
+
+          const userFilter = { _id: new ObjectId(currentUser) };
+          const userDoc = {
+            $set: { room: currentRoom, bookedOn: today, bookedTill: oneMonth },
+          };
+          const updateUser = await usersCollection.updateOne(
+            userFilter,
+            userDoc
+          );
+
+          console.log(updateRoom, updateUser);
+        }
+      }
+    });
+
+    // Meal selection
+
+    const job = nodeCron.schedule("* * 23 * * *", async () => {
+      const today = new Date();
+      const tomorrow = new Date(
+        `${today.getFullYear()}-${today.getMonth() + 1}-${today.getDate()}`
+      );
+      const todayDate = today.toDateString();
+      const tomorrowDate = tomorrow.toDateString();
+      const meals = await mealCollection.find({}).toArray();
+      meals.map((meal) => {
+        meal.bookedBy.map(async (element) => {
+          const tempDate = element.mealDay.toDateString();
+          if (tempDate < todayDate) {
+            const query = {
+              _id: new ObjectId(meal._id),
+              "bookedBy.uid": element.uid,
+            };
+            const updateDoc = { $set: { "bookedBy.$.mealDay": tomorrow } };
+            const result = await mealCollection.updateOne(query, updateDoc);
+            // console.log(result);
+          }
+          // console.log(tempDate);
+        });
+      });
+    });
+
+    app.put("/meals", async (req, res) => {
+      // console.log(req.body);
+      const breakfast = req.body.breakfast;
+      const lunch = req.body.lunch;
+      const dinner = req.body.dinner;
+
+      const today = new Date();
+
+      const tomorrow = new Date(
+        `${today.getFullYear()}-${today.getMonth() + 1}-${today.getDate() + 1}`
+      );
+
+      if (breakfast.id) {
+        const allBreakfasts = await mealCollection
+          .find({ time: "Breakfast" })
+          .toArray();
+
+        allBreakfasts.map(async (item) => {
+          const user = req.body.currentUser;
+          const newBooking = item.bookedBy.filter(
+            (element) => element.uid != user
+          );
+
+          const filter = { _id: item._id };
+          const updateDoc = { $set: { bookedBy: newBooking } };
+          const result = await mealCollection.updateOne(filter, updateDoc);
+        });
+        const chosenBreakfast = await mealCollection.findOne({
+          _id: new ObjectId(breakfast.id),
+        });
+        const booking = chosenBreakfast.bookedBy;
+        // booking.push(req.body.currentUser);
+        booking.push({ uid: req.body.currentUser, mealDay: tomorrow });
+
+        const filter = { _id: new ObjectId(breakfast.id) };
+        const updateDoc = { $set: { bookedBy: booking } };
+        const result = await mealCollection.updateOne(filter, updateDoc);
+      } else {
+        const allBreakfasts = await mealCollection
+          .find({ time: "Breakfast" })
+          .toArray();
+
+        allBreakfasts.map(async (item) => {
+          const newBooking = item.bookedBy.filter(
+            (element) => element.uid != req.body.currentUser
+          );
+
+          const filter = { _id: item._id };
+          const updateDoc = { $set: { bookedBy: newBooking } };
+          const result = await mealCollection.updateOne(filter, updateDoc);
+        });
+      }
+
+      if (lunch.id) {
+        const allLunch = await mealCollection.find({ time: "Lunch" }).toArray();
+
+        allLunch.map(async (item) => {
+          const user = req.body.currentUser;
+          const newBooking = item.bookedBy.filter(
+            (element) => element.uid != user
+          );
+
+          const filter = { _id: item._id };
+          const updateDoc = { $set: { bookedBy: newBooking } };
+          const result = await mealCollection.updateOne(filter, updateDoc);
+        });
+        const chosenLunch = await mealCollection.findOne({
+          _id: new ObjectId(lunch.id),
+        });
+        const booking = chosenLunch.bookedBy;
+        booking.push({ uid: req.body.currentUser, mealDay: tomorrow });
+
+        const filter = { _id: new ObjectId(lunch.id) };
+        const updateDoc = { $set: { bookedBy: booking } };
+        const result = await mealCollection.updateOne(filter, updateDoc);
+      } else {
+        const allLunch = await mealCollection.find({ time: "Lunch" }).toArray();
+
+        allLunch.map(async (item) => {
+          const newBooking = item.bookedBy.filter(
+            (element) => element.uid != req.body.currentUser
+          );
+
+          const filter = { _id: item._id };
+          const updateDoc = { $set: { bookedBy: newBooking } };
+          const result = await mealCollection.updateOne(filter, updateDoc);
+        });
+      }
+
+      if (dinner.id) {
+        const allDinner = await mealCollection
+          .find({ time: "Dinner" })
+          .toArray();
+
+        allDinner.map(async (item) => {
+          const user = req.body.currentUser;
+          const newBooking = item.bookedBy.filter(
+            (element) => element.uid != user
+          );
+
+          const filter = { _id: item._id };
+          const updateDoc = { $set: { bookedBy: newBooking } };
+          const result = await mealCollection.updateOne(filter, updateDoc);
+        });
+        const chosenDinner = await mealCollection.findOne({
+          _id: new ObjectId(dinner.id),
+        });
+        const booking = chosenDinner.bookedBy;
+        booking.push({ uid: req.body.currentUser, mealDay: tomorrow });
+
+        const filter = { _id: new ObjectId(dinner.id) };
+        const updateDoc = { $set: { bookedBy: booking } };
+        const result = await mealCollection.updateOne(filter, updateDoc);
+      } else {
+        const allDinner = await mealCollection
+          .find({ time: "Dinner" })
+          .toArray();
+
+        allDinner.map(async (item) => {
+          const newBooking = item.bookedBy.filter(
+            (element) => element.uid != req.body.currentUser
+          );
+
+          const filter = { _id: item._id };
+          const updateDoc = { $set: { bookedBy: newBooking } };
+          const result = await mealCollection.updateOne(filter, updateDoc);
+        });
+      }
+
+      const doc = await mealCollection.find({}).toArray();
+      console.log(doc);
+      res.send(doc);
+    });
 
     //Remove user from Admin position - Christos
     app.put("/users", async (req, res) => {
@@ -261,6 +518,40 @@ async function run() {
       const updateDoc = { $set: { role: "user" } };
       const result = await usersCollection.updateOne(filter, updateDoc);
       res.send(result);
+    });
+
+    // Get unoccupied rooms - Christos
+    app.get("/unoccupiedRooms", async (req, res) => {
+      const query = { bookedBy: [] };
+      const cursor = await roomCollection.find(query).toArray();
+      res.send(cursor);
+    });
+
+    // Get occupied rooms - Christos
+    app.get("/occupiedRooms", async (req, res) => {
+      const query = { category: "Economic" };
+      const sharedRooms = await roomCollection.find(query).toArray();
+      const cursor = sharedRooms.filter(
+        (e) => parseInt(e.seat) > 0 && parseInt(e.seat) < 4
+      );
+      res.send(cursor);
+    });
+
+    // Get full rooms - Christos
+    app.get("/fullRooms", async (req, res) => {
+      const sharedRooms = await roomCollection
+        .find({ category: "Economic" })
+        .toArray();
+      const privateRooms = await roomCollection
+        .find({ category: "Business" })
+        .toArray();
+      const cursor1 = sharedRooms.filter((e) => parseInt(e.seat) === 0);
+
+      const cursor2 = privateRooms.filter(
+        (e) => e.bookedBy != "" && e.bookedBy != []
+      );
+      const cursor = cursor1.concat(cursor2);
+      res.send(cursor);
     });
 
     // Get user info by ID - Christos
