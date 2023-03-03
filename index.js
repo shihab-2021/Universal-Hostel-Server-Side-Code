@@ -25,6 +25,7 @@ async function run() {
     const usersCollection = database.collection("users");
     const roomCollection = database.collection("rooms");
     const mealCollection = database.collection("meals");
+    const paymentCollection = database.collection("payments");
 
     // user post api
     app.post("/users-data", async (req, res) => {
@@ -216,6 +217,19 @@ async function run() {
       const query = { _id: new ObjectId(req?.params?.id) };
       const result = await mealCollection?.deleteOne(query);
       res.json(result);
+    });
+
+    // payment post api
+    app.post("/payment", async (req, res) => {
+      const cursor = await paymentCollection.insertOne(req.body);
+      res.json(cursor);
+    });
+
+    // for getting all payments
+    app.get("/payments", async (req, res) => {
+      const cursor = paymentCollection?.find({});
+      const payments = await cursor?.toArray();
+      res.json(payments);
     });
 
     //-------------------------------------------------------------
