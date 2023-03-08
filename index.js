@@ -162,6 +162,20 @@ async function run() {
       const query = { _id: ObjectId(req.params.id) };
       const result = await usersCollection.deleteOne(query);
       res.json(result);
+
+      const allBreakfasts = await mealCollection
+        .find({ time: "Breakfast" })
+        .toArray();
+
+      allBreakfasts.map(async (item) => {
+        const newBooking = item.bookedBy.filter(
+          (element) => element.uid != req.params.id
+        );
+
+        const filter = { _id: item._id };
+        const updateDoc = { $set: { bookedBy: newBooking } };
+        const result = await mealCollection.updateOne(filter, updateDoc);
+      });
     });
 
     // for getting all room
@@ -232,6 +246,13 @@ async function run() {
       res.json(payments);
     });
 
+    // for getting payment by id
+    app.get("/payments/:id", async (req, res) => {
+      const query = { uid: req?.params?.id };
+      const cursor = await paymentCollection.findOne(query);
+      res.json(cursor);
+    });
+
     //-------------------------------------------------------------
     //-------------------------------------------------------------
     //------------------CHRISTOS-----------------------------------
@@ -239,7 +260,6 @@ async function run() {
     //-------------------------------------------------------------
 
     //Room cancelation
-
     app.put("/cancelRoom", async (req, res) => {
       const userId = req.body.currentUser;
       const roomId = req.body.roomId;
@@ -298,9 +318,11 @@ async function run() {
       });
 
       const today = new Date();
-      const oneMonth = new Date(
-        `${today.getFullYear()}-${today.getMonth() + 2}-${today.getDate()}`
-      );
+      // const oneMonth = new Date(
+      //   `${today.getFullYear()}-${today.getMonth() + 2}-${today.getDate()}`
+      // );
+      const oneMonth = new Date();
+      oneMonth.setMonth(today.getMonth() + 1);
 
       if (currentRoom.category === "Business") {
         if (currentRoom.bookedBy != currentUser) {
@@ -365,25 +387,173 @@ async function run() {
       }
     });
 
-    // Meal selection
+    // Meal Payment
+    // const handleMealPayment = nodeCron.schedule("*/5 * * * * *", async () => {
+    //   console.log("second job");
+    // });
 
-    const job = nodeCron.schedule("* * 23 * * *", async () => {
+    // Repeated meal selection
+
+    const job = nodeCron.schedule("*/10 * * * * *", async () => {
       const today = new Date();
-      const tomorrow = new Date(
-        `${today.getFullYear()}-${today.getMonth() + 1}-${today.getDate()}`
-      );
+      const tomorrow = new Date();
+      const nextMonth = new Date();
+      nextMonth.setMonth(today.getMonth() + 1);
+      console.log(today);
+      tomorrow.setDate(today.getDate() + 1);
       const todayDate = today.toDateString();
       const tomorrowDate = tomorrow.toDateString();
       const meals = await mealCollection.find({}).toArray();
+      const rooms = await roomCollection.find({}).toArray();
+
+      rooms.map(async (individualRoom) => {
+        if (individualRoom.category == "Business") {
+          if (
+            today > individualRoom.bookedTill &&
+            individualRoom.bookedBy != ""
+          ) {
+            const user = individualRoom.bookedBy;
+            const roomId = individualRoom._id;
+            const roomFilter = { _id: new ObjectId(roomId) };
+            const roomDoc = {
+              $set: {
+                bookedBy: user,
+                bookedOn: individualRoom.bookedOn,
+                bookedTill: nextMonth,
+              },
+            };
+            const updateRoom = await roomCollection.updateOne(
+              roomFilter,
+              roomDoc
+            );
+
+            const userFilter = { _id: new ObjectId(user) };
+            const userDoc = {
+              $set: {
+                room: individualRoom,
+                bookedOn: individualRoom.bookedOn,
+                bookedTill: nextMonth,
+              },
+            };
+            const updateUser = await usersCollection.updateOne(
+              userFilter,
+              userDoc
+            );
+
+            const userPaymentRecord = await paymentCollection.findOne({
+              uid: user,
+            });
+            const paymentQuery = { uid: user };
+            const paymentDoc = {
+              $push: {
+                paymentHistory: {
+                  date: today,
+                  amount: parseInt(individualRoom.cost),
+                  type: "rent",
+                },
+              },
+              $set: {
+                rent:
+                  parseInt(userPaymentRecord?.rent) +
+                  parseInt(individualRoom.cost),
+              },
+            };
+            const paymentResult = await paymentCollection.updateOne(
+              paymentQuery,
+              paymentDoc
+            );
+          }
+        } else {
+          individualRoom.bookedBy.map(async (e) => {
+            if (today > e.bookedTill) {
+              const user = e.uid;
+              const roomId = individualRoom._id;
+              const roomFilter = { _id: new ObjectId(roomId) };
+              const roomDoc = {
+                $set: {
+                  bookedBy: user,
+                  bookedOn: e.bookedOn,
+                  bookedTill: nextMonth,
+                },
+              };
+              const updateRoom = await roomCollection.updateOne(
+                roomFilter,
+                roomDoc
+              );
+
+              const userFilter = { _id: new ObjectId(user) };
+              const userDoc = {
+                $set: {
+                  room: individualRoom,
+                  bookedOn: e.bookedOn,
+                  bookedTill: nextMonth,
+                },
+              };
+              const updateUser = await usersCollection.updateOne(
+                userFilter,
+                userDoc
+              );
+
+              const userPaymentRecord = await paymentCollection.findOne({
+                uid: user,
+              });
+              const paymentQuery = { uid: user };
+              const paymentDoc = {
+                $push: {
+                  paymentHistory: {
+                    date: today,
+                    amount: parseInt(individualRoom.cost),
+                    type: "rent",
+                  },
+                },
+                $set: {
+                  rent:
+                    parseInt(userPaymentRecord?.rent) +
+                    parseInt(individualRoom.cost),
+                },
+              };
+              const paymentResult = await paymentCollection.updateOne(
+                paymentQuery,
+                paymentDoc
+              );
+            }
+          });
+        }
+      });
+
       meals.map((meal) => {
         meal.bookedBy.map(async (element) => {
-          const tempDate = element.mealDay.toDateString();
-          if (tempDate < todayDate) {
+          const currentPayment = await paymentCollection.findOne({
+            uid: element.uid,
+          });
+          // console.log(currentPayment?.email, currentPayment);
+          const tempDate = element.mealDay;
+          // console.log(tempDate, today);
+          console.log(today, today.toDateString());
+          if (tempDate.toDateString() < today.toDateString()) {
+            const paymentQuery = { uid: element.uid };
+            const paymentDoc = {
+              $push: {
+                paymentHistory: {
+                  date: today,
+                  amount: parseInt(meal.cost),
+                  type: "meal",
+                },
+              },
+              $set: {
+                due: parseInt(currentPayment?.due) + parseInt(meal.cost),
+              },
+            };
+            const paymentResult = await paymentCollection.updateOne(
+              paymentQuery,
+              paymentDoc
+            );
+            console.log(paymentResult);
             const query = {
               _id: new ObjectId(meal._id),
               "bookedBy.uid": element.uid,
             };
-            const updateDoc = { $set: { "bookedBy.$.mealDay": tomorrow } };
+            const updateDoc = { $set: { "bookedBy.$.mealDay": today } };
             const result = await mealCollection.updateOne(query, updateDoc);
             // console.log(result);
           }
@@ -392,17 +562,31 @@ async function run() {
       });
     });
 
+    // Meal selection
     app.put("/meals", async (req, res) => {
       // console.log(req.body);
       const breakfast = req.body.breakfast;
       const lunch = req.body.lunch;
       const dinner = req.body.dinner;
+      const user = req.body.currentUser;
 
       const today = new Date();
 
-      const tomorrow = new Date(
-        `${today.getFullYear()}-${today.getMonth() + 1}-${today.getDate() + 1}`
-      );
+      const tomorrow = new Date();
+      tomorrow.setDate(today.getDate() + 1);
+
+      const allMeals = await mealCollection.find({}).toArray();
+
+      allMeals.map(async (item) => {
+        const newBooking = item.bookedBy.filter((e) => e.uid != user);
+
+        const filter = { _id: item._id };
+        const updateDoc = {
+          $set: { bookedBy: newBooking },
+        };
+        const result = await mealCollection.updateOne(filter, updateDoc);
+        console.log(item.time, item.bookedBy);
+      });
 
       if (breakfast.id) {
         const allBreakfasts = await mealCollection
@@ -410,24 +594,28 @@ async function run() {
           .toArray();
 
         allBreakfasts.map(async (item) => {
-          const user = req.body.currentUser;
           const newBooking = item.bookedBy.filter(
             (element) => element.uid != user
           );
 
           const filter = { _id: item._id };
-          const updateDoc = { $set: { bookedBy: newBooking } };
+          const updateDoc = {
+            $set: { bookedBy: newBooking },
+          };
           const result = await mealCollection.updateOne(filter, updateDoc);
         });
         const chosenBreakfast = await mealCollection.findOne({
           _id: new ObjectId(breakfast.id),
         });
+        // console.log(chosenBreakfast);
         const booking = chosenBreakfast.bookedBy;
         // booking.push(req.body.currentUser);
-        booking.push({ uid: req.body.currentUser, mealDay: tomorrow });
+        booking.push({ uid: req.body.currentUser, mealDay: today });
 
         const filter = { _id: new ObjectId(breakfast.id) };
-        const updateDoc = { $set: { bookedBy: booking } };
+        const updateDoc = {
+          $set: { bookedBy: booking, mealNo: breakfast.itemPack },
+        };
         const result = await mealCollection.updateOne(filter, updateDoc);
       } else {
         const allBreakfasts = await mealCollection
@@ -462,10 +650,12 @@ async function run() {
           _id: new ObjectId(lunch.id),
         });
         const booking = chosenLunch.bookedBy;
-        booking.push({ uid: req.body.currentUser, mealDay: tomorrow });
+        booking.push({ uid: req.body.currentUser, mealDay: today });
 
         const filter = { _id: new ObjectId(lunch.id) };
-        const updateDoc = { $set: { bookedBy: booking } };
+        const updateDoc = {
+          $set: { bookedBy: booking, mealNo: lunch.itemPack },
+        };
         const result = await mealCollection.updateOne(filter, updateDoc);
       } else {
         const allLunch = await mealCollection.find({ time: "Lunch" }).toArray();
@@ -500,10 +690,12 @@ async function run() {
           _id: new ObjectId(dinner.id),
         });
         const booking = chosenDinner.bookedBy;
-        booking.push({ uid: req.body.currentUser, mealDay: tomorrow });
+        booking.push({ uid: req.body.currentUser, mealDay: today });
 
         const filter = { _id: new ObjectId(dinner.id) };
-        const updateDoc = { $set: { bookedBy: booking } };
+        const updateDoc = {
+          $set: { bookedBy: booking, mealNo: dinner.itemPack },
+        };
         const result = await mealCollection.updateOne(filter, updateDoc);
       } else {
         const allDinner = await mealCollection
@@ -522,7 +714,7 @@ async function run() {
       }
 
       const doc = await mealCollection.find({}).toArray();
-      console.log(doc);
+      // console.log(doc);
       res.send(doc);
     });
 
