@@ -241,6 +241,14 @@ async function run() {
       res.json(cursor);
     });
 
+    // users information by email
+    app.get("/payments/:uid", async (req, res) => {
+      const uid = req.params.uid;
+      const query = { uid: uid };
+      const payment = await paymentCollection?.findOne(query);
+      res.json(payment);
+    });
+
     // for getting all payments
     app.get("/payments", async (req, res) => {
       const cursor = paymentCollection?.find({});
