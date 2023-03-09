@@ -241,7 +241,7 @@ async function run() {
       res.json(cursor);
     });
 
-    // users information by email
+    // users information by user id
     app.get("/payments/:uid", async (req, res) => {
       const uid = req.params.uid;
       const query = { uid: uid };
@@ -442,7 +442,7 @@ async function run() {
         const roomFilter = { _id: new ObjectId(roomId) };
         const roomDoc = {
           $set: {
-            bookedBy: [],
+            bookedBy: "",
             bookedOn: "",
             bookedTill: "",
           },
@@ -567,7 +567,6 @@ async function run() {
       const tomorrow = new Date();
       const nextMonth = new Date();
       nextMonth.setMonth(today.getMonth() + 1);
-      console.log(today);
       tomorrow.setDate(today.getDate() + 1);
       const todayDate = today.toDateString();
       const tomorrowDate = tomorrow.toDateString();
@@ -581,66 +580,20 @@ async function run() {
             individualRoom.bookedBy != ""
           ) {
             const user = individualRoom.bookedBy;
-            const roomId = individualRoom._id;
-            const roomFilter = { _id: new ObjectId(roomId) };
-            const roomDoc = {
-              $set: {
-                bookedBy: user,
-                bookedOn: individualRoom.bookedOn,
-                bookedTill: nextMonth,
-              },
-            };
-            const updateRoom = await roomCollection.updateOne(
-              roomFilter,
-              roomDoc
-            );
-
-            const userFilter = { _id: new ObjectId(user) };
-            const userDoc = {
-              $set: {
-                room: individualRoom,
-                bookedOn: individualRoom.bookedOn,
-                bookedTill: nextMonth,
-              },
-            };
-            const updateUser = await usersCollection.updateOne(
-              userFilter,
-              userDoc
-            );
-
-            const userPaymentRecord = await paymentCollection.findOne({
+            const currentPayment = await paymentCollection.findOne({
               uid: user,
             });
-            const paymentQuery = { uid: user };
-            const paymentDoc = {
-              $push: {
-                paymentHistory: {
-                  date: today,
-                  amount: parseInt(individualRoom.cost),
-                  type: "rent",
-                },
-              },
-              $set: {
-                rent:
-                  parseInt(userPaymentRecord?.rent) +
-                  parseInt(individualRoom.cost),
-              },
-            };
-            const paymentResult = await paymentCollection.updateOne(
-              paymentQuery,
-              paymentDoc
-            );
-          }
-        } else {
-          individualRoom.bookedBy.map(async (e) => {
-            if (today > e.bookedTill) {
-              const user = e.uid;
+
+            if (
+              parseInt(currentPayment.due) + parseInt(currentPayment.rent) <
+              2500
+            ) {
               const roomId = individualRoom._id;
               const roomFilter = { _id: new ObjectId(roomId) };
               const roomDoc = {
                 $set: {
                   bookedBy: user,
-                  bookedOn: e.bookedOn,
+                  bookedOn: individualRoom.bookedOn,
                   bookedTill: nextMonth,
                 },
               };
@@ -653,7 +606,7 @@ async function run() {
               const userDoc = {
                 $set: {
                   room: individualRoom,
-                  bookedOn: e.bookedOn,
+                  bookedOn: individualRoom.bookedOn,
                   bookedTill: nextMonth,
                 },
               };
@@ -667,13 +620,13 @@ async function run() {
               });
               const paymentQuery = { uid: user };
               const paymentDoc = {
-                $push: {
-                  paymentHistory: {
-                    date: today,
-                    amount: parseInt(individualRoom.cost),
-                    type: "rent",
-                  },
-                },
+                // $push: {
+                //   paymentHistory: {
+                //     date: today,
+                //     amount: parseInt(individualRoom.cost),
+                //     type: "rent",
+                //   },
+                // },
                 $set: {
                   rent:
                     parseInt(userPaymentRecord?.rent) +
@@ -685,6 +638,80 @@ async function run() {
                 paymentDoc
               );
             }
+          }
+        } else {
+          individualRoom.bookedBy.map(async (e) => {
+            if (today > e.bookedTill) {
+              const user = e.uid;
+              const currentPayment = await paymentCollection.findOne({
+                uid: user,
+              });
+
+              if (
+                parseInt(currentPayment.due) + parseInt(currentPayment.rent) <
+                2500
+              ) {
+                const currentRoom = await roomCollection.findOne({
+                  _id: new ObjectId(roomId),
+                });
+                const roomResidents = currentRoom.bookedBy.filter((elem) => {
+                  return elem.uid != e.uid;
+                });
+                roomResidents.push({
+                  uid: user,
+                  bookedBy: e.bookedBy,
+                  bookedTill: e.nextMonth,
+                });
+
+                const roomId = individualRoom._id;
+                const roomFilter = { _id: new ObjectId(roomId) };
+                const roomDoc = {
+                  $set: {
+                    bookedBy: roomResidents,
+                  },
+                };
+                const updateRoom = await roomCollection.updateOne(
+                  roomFilter,
+                  roomDoc
+                );
+
+                const userFilter = { _id: new ObjectId(user) };
+                const userDoc = {
+                  $set: {
+                    room: individualRoom,
+                    bookedOn: e.bookedOn,
+                    bookedTill: nextMonth,
+                  },
+                };
+                const updateUser = await usersCollection.updateOne(
+                  userFilter,
+                  userDoc
+                );
+
+                const userPaymentRecord = await paymentCollection.findOne({
+                  uid: user,
+                });
+                const paymentQuery = { uid: user };
+                const paymentDoc = {
+                  // $push: {
+                  //   paymentHistory: {
+                  //     date: today,
+                  //     amount: parseInt(individualRoom.cost),
+                  //     type: "rent",
+                  //   },
+                  // },
+                  $set: {
+                    rent:
+                      parseInt(userPaymentRecord?.rent) +
+                      parseInt(individualRoom.cost),
+                  },
+                };
+                const paymentResult = await paymentCollection.updateOne(
+                  paymentQuery,
+                  paymentDoc
+                );
+              }
+            }
           });
         }
       });
@@ -694,38 +721,50 @@ async function run() {
           const currentPayment = await paymentCollection.findOne({
             uid: element.uid,
           });
-          // console.log(currentPayment?.email, currentPayment);
-          const tempDate = element.mealDay;
-          // console.log(tempDate, today);
-          console.log(today, today.toDateString());
-          if (tempDate.toDateString() < today.toDateString()) {
-            const paymentQuery = { uid: element.uid };
-            const paymentDoc = {
-              $push: {
-                paymentHistory: {
-                  date: today,
-                  amount: parseInt(meal.cost),
-                  type: "meal",
+          const currentUserRoom = await usersCollection.findOne({
+            _id: new ObjectId(element.uid),
+          });
+
+          //Work Pending
+
+          if (
+            parseInt(currentPayment.due) + parseInt(currentPayment.rent) <
+            2500
+          ) {
+            // console.log(currentPayment?.email, currentPayment);
+            const tempDate = element.mealDay;
+            console.log(tempDate);
+            console.log(tempDate.toUTCString());
+            console.log(tempDate.toTimeString());
+            if (tempDate.toDateString() < today.toDateString()) {
+              const paymentQuery = { uid: element.uid };
+              const paymentDoc = {
+                // $push: {
+                //   paymentHistory: {
+                //     date: today,
+                //     amount: parseInt(meal.cost),
+                //     type: "meal",
+                //   },
+                // },
+                $set: {
+                  due: parseInt(currentPayment?.due) + parseInt(meal.cost),
                 },
-              },
-              $set: {
-                due: parseInt(currentPayment?.due) + parseInt(meal.cost),
-              },
-            };
-            const paymentResult = await paymentCollection.updateOne(
-              paymentQuery,
-              paymentDoc
-            );
-            console.log(paymentResult);
-            const query = {
-              _id: new ObjectId(meal._id),
-              "bookedBy.uid": element.uid,
-            };
-            const updateDoc = { $set: { "bookedBy.$.mealDay": today } };
-            const result = await mealCollection.updateOne(query, updateDoc);
-            // console.log(result);
+              };
+              const paymentResult = await paymentCollection.updateOne(
+                paymentQuery,
+                paymentDoc
+              );
+              console.log(paymentResult);
+              const query = {
+                _id: new ObjectId(meal._id),
+                "bookedBy.uid": element.uid,
+              };
+              const updateDoc = { $set: { "bookedBy.$.mealDay": today } };
+              const result = await mealCollection.updateOne(query, updateDoc);
+              console.log("updated to today: ", result);
+            }
+            // console.log(tempDate);
           }
-          // console.log(tempDate);
         });
       });
     });
