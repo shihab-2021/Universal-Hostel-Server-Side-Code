@@ -261,6 +261,12 @@ async function run() {
       const paymentID = req.body.id;
       const amount = req.body.amount;
       const paymentType = req.body.amount;
+      let time = new Date();
+      const currentTime = time.toLocaleString("en-US", {
+        hour: "numeric",
+        minute: "numeric",
+        hour12: true,
+      });
       const userPaymentRecord = await paymentCollection.findOne({
         _id: new ObjectId(paymentID),
       });
@@ -268,7 +274,8 @@ async function run() {
       const paymentDoc = {
         $push: {
           paymentHistory: {
-            date: today,
+            date: time,
+            time: currentTime,
             amount: parseInt(amount),
           },
         },
@@ -281,6 +288,15 @@ async function run() {
         paymentQuery,
         paymentDoc
       );
+      res.json(paymentResult);
+      console.log(paymentResult);
+    });
+
+    // payment delete api
+    app.delete("/delete-payment/:id", async (req, res) => {
+      const query = { _id: new ObjectId(req?.params?.id) };
+      const result = await paymentCollection?.deleteOne(query);
+      res.json(result);
     });
 
     // payment post api
@@ -294,6 +310,14 @@ async function run() {
       const cursor = noticeCollection?.find({});
       const notices = await cursor?.toArray();
       res.json(notices);
+    });
+
+    // room delete api
+    app.delete("/delete-notice/:id", async (req, res) => {
+      const query = { _id: new ObjectId(req?.params?.id) };
+      const result = await noticeCollection?.deleteOne(query);
+      res.json(result);
+      console.log(result);
     });
 
     // // for getting payment by id
