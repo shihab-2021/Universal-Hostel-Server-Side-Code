@@ -727,45 +727,48 @@ async function run() {
             _id: new ObjectId(element.uid),
           });
 
-          //Work Pending
-
           if (
             parseInt(currentPayment.due) + parseInt(currentPayment.rent) <
             2500
           ) {
-            // console.log(currentPayment?.email, currentPayment);
-            const tempDate = element.mealDay;
-            console.log(tempDate);
-            console.log(tempDate.toUTCString());
-            console.log(tempDate.toTimeString());
-            if (tempDate.toDateString() < today.toDateString()) {
-              const paymentQuery = { uid: element.uid };
-              const paymentDoc = {
-                // $push: {
-                //   paymentHistory: {
-                //     date: today,
-                //     amount: parseInt(meal.cost),
-                //     type: "meal",
-                //   },
-                // },
-                $set: {
-                  due: parseInt(currentPayment?.due) + parseInt(meal.cost),
-                },
-              };
-              const paymentResult = await paymentCollection.updateOne(
-                paymentQuery,
-                paymentDoc
-              );
-              console.log(paymentResult);
-              const query = {
-                _id: new ObjectId(meal._id),
-                "bookedBy.uid": element.uid,
-              };
-              const updateDoc = { $set: { "bookedBy.$.mealDay": today } };
-              const result = await mealCollection.updateOne(query, updateDoc);
-              console.log("updated to today: ", result);
+            if (
+              Object.keys(currentUserRoom.room).length != 0 ||
+              currentUserRoom.room != ""
+            ) {
+              // console.log(currentPayment?.email, currentPayment);
+              const tempDate = element.mealDay;
+              console.log(tempDate);
+              console.log(tempDate.toUTCString());
+              console.log(tempDate.toTimeString());
+              if (tempDate.toDateString() < today.toDateString()) {
+                const paymentQuery = { uid: element.uid };
+                const paymentDoc = {
+                  // $push: {
+                  //   paymentHistory: {
+                  //     date: today,
+                  //     amount: parseInt(meal.cost),
+                  //     type: "meal",
+                  //   },
+                  // },
+                  $set: {
+                    due: parseInt(currentPayment?.due) + parseInt(meal.cost),
+                  },
+                };
+                const paymentResult = await paymentCollection.updateOne(
+                  paymentQuery,
+                  paymentDoc
+                );
+                console.log(paymentResult);
+                const query = {
+                  _id: new ObjectId(meal._id),
+                  "bookedBy.uid": element.uid,
+                };
+                const updateDoc = { $set: { "bookedBy.$.mealDay": today } };
+                const result = await mealCollection.updateOne(query, updateDoc);
+                console.log("updated to today: ", result);
+              }
+              // console.log(tempDate);
             }
-            // console.log(tempDate);
           }
         });
       });
