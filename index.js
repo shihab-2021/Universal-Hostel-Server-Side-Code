@@ -456,6 +456,7 @@ async function run() {
         const updateUser = await usersCollection.updateOne(userFilter, userDoc);
 
         console.log(updateRoom, updateUser);
+        res.json(updateUser);
       } else {
         const seats = currentRoom.seat;
         const roomFilter = { _id: new ObjectId(roomId) };
@@ -473,6 +474,7 @@ async function run() {
         const updateUser = await usersCollection.updateOne(userFilter, userDoc);
 
         console.log(roomResidents);
+        res.json(updateUser);
       }
     });
 
