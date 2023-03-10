@@ -438,6 +438,8 @@ async function run() {
         _id: new ObjectId(userId),
       });
 
+      const allMeals = await mealCollection.find({}).toArray();
+
       if (currentRoom.category === "Business") {
         const roomFilter = { _id: new ObjectId(roomId) };
         const roomDoc = {
@@ -474,6 +476,23 @@ async function run() {
 
         console.log(roomResidents);
       }
+
+      allMeals.map((mealItem) => {
+        mealItem.bookedBy.map(async (e) => {
+          if (e.uid == userId) {
+            const newBookedBy = mealItem.bookedBy.filter((element) => {
+              return element.uid != userId;
+            });
+            const mealFilter = {
+              _id: new ObjectId(mealItem._id),
+              "bookedBy.uid": userId,
+            };
+            const mealDoc = { $set: { bookedBy: newBookedBy } };
+
+            const result = await mealCollection.updateOne(mealFilter, mealDoc);
+          }
+        });
+      });
     });
 
     //Room Selection
@@ -564,7 +583,9 @@ async function run() {
 
     const job = nodeCron.schedule("*/10 * * * * *", async () => {
       const today = new Date();
+      today.setHours(0, 0, 0, 0);
       const tomorrow = new Date();
+      tomorrow.setHours(0, 0, 0, 0);
       const nextMonth = new Date();
       nextMonth.setMonth(today.getMonth() + 1);
       tomorrow.setDate(today.getDate() + 1);
@@ -735,10 +756,10 @@ async function run() {
             ) {
               // console.log(currentPayment?.email, currentPayment);
               const tempDate = element.mealDay;
-              console.log(tempDate);
-              console.log(tempDate.toUTCString());
-              console.log(tempDate.toTimeString());
-              if (tempDate.toDateString() < today.toDateString()) {
+              tempDate.setHours(0, 0, 0, 0);
+              console.log(tempDate > today);
+              console.log(tempDate.toDateString(), today.toDateString());
+              if (tempDate < today) {
                 const paymentQuery = { uid: element.uid };
                 const paymentDoc = {
                   // $push: {
